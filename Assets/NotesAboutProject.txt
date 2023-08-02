@@ -1,0 +1,2 @@
+[changed] Project Settings -> Iput Manager -> Axes -> Horizontal -> snap: false
+[changed] Project Settings -> Iput Manager -> Axes -> Vertical -> snap: false
