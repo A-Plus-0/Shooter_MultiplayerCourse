@@ -4,9 +4,12 @@ using UnityEngine;
 
 public class MultiplayerManager : ColyseusManager<MultiplayerManager>
 {
-    [SerializeField] private GameObject _player;
+    [SerializeField] private PlayerCharacter _player;
     [SerializeField] private EnemyController _enemy;
+
     private ColyseusRoom<State> _room;
+    private Dictionary<string, EnemyController> _enemies = new Dictionary<string, EnemyController>();
+
     protected override void Awake()
     {
         base.Awake();
@@ -15,18 +18,33 @@ public class MultiplayerManager : ColyseusManager<MultiplayerManager>
         Connect();
     }
 
-
     private async void Connect()
     {
-        _room = await Instance.client.JoinOrCreate<State>("state_handler");
+        Dictionary<string, object> data = new Dictionary<string, object>()
+        {
+            {"speed",_player.speed }
+        };
+
+        _room = await Instance.client.JoinOrCreate<State>("state_handler", data);
+
         _room.OnStateChange += OnStateChange;
+        _room.OnMessage<string>("Shoot", ApplyShoot);
+    }
+
+    private void ApplyShoot(string jsomShootInfo)
+    {
+        ShootInfo shootInfo = JsonUtility.FromJson<ShootInfo>(jsomShootInfo);
+        if (_enemies.ContainsKey(shootInfo.key) == false)
+        {
+            Debug.LogError("Enemy not exit, but he try shoot");
+            return;
+        }
+        _enemies[shootInfo.key].Shoot(shootInfo);
     }
 
     private void OnStateChange(State state, bool isFirstState)
     {
         if (!isFirstState) { return; }
-
-
 
         state.players.ForEach((key, player) =>
         {
@@ -40,24 +58,30 @@ public class MultiplayerManager : ColyseusManager<MultiplayerManager>
 
     private void CreatePlayer(/*string key, */Player player)
     {
-        var position = new Vector3(player.x, 0f, player.y);
+        var position = new Vector3(player.pX, player.pY, player.pZ);
 
         Instantiate(_player, position, Quaternion.identity);
     }
+
     private void CreateEnemy(string key, Player player)
     {
-        var position = new Vector3(player.x, 0f, player.y);
+        var position = new Vector3(player.pX, player.pY, player.pZ);
 
         var enemy = Instantiate(_enemy, position, Quaternion.identity);
-        player.OnChange += enemy.OnChange;
+        enemy.Init(player);
+
+        _enemies.Add(key, enemy);
     }
 
     private void RemoveEnemy(string key, Player player)
     {
+        if (_enemies.ContainsKey(key) == false) return;
 
+        var enemy = _enemies[key];
+        _enemy.Destroy();
+
+        _enemies.Remove(key);
     }
-
-
 
     protected override void OnDestroy()
     {
@@ -66,7 +90,16 @@ public class MultiplayerManager : ColyseusManager<MultiplayerManager>
     }
 
 
+    public string GetSessionID() => _room.SessionId;
+
     public void SendMessage(string key, Dictionary<string, object> data)
+    {
+        //Debug.Log(data);
+
+        _room.Send(key, data);
+    }
+
+    public void SendMessage(string key, string data)
     {
         _room.Send(key, data);
     }
