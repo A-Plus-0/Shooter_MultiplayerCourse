@@ -1,15 +1,26 @@
+using System.Collections.Generic;
 using UnityEngine;
+using static UnityEngine.Rendering.DebugUI;
 
 public class EnemyCharacter : Character
 {
+    private string _sessionID;
+    [SerializeField] private Health _health;
     [SerializeField] private Transform _head;
     public Vector3 targetPosition { get; private set; } = Vector3.zero;
     private float _velocityMagnitude = 0;
+
+    public void Init(string sessionID)
+    {
+        _sessionID = sessionID;
+    }
 
     public Vector2 targetRotate { get; private set; } = Vector2.zero;
 
     private float _crouchFase = 0;
     [SerializeField] private CapsuleCollider _capsuleCollider;
+
+
 
     private void Start()
     {
@@ -52,12 +63,37 @@ public class EnemyCharacter : Character
 
     public void SetCrouch(bool value) => isCrouch = value;
     public void SetSpeed(float value) => speed = value;
+    public void SetMaxHP(int value)
+    {
+        maxHealth = value;
+        _health.SetMax(value);
+        _health.SetCurrent(value);
+
+    }
+
+    public void RestoreHP(int newValue) {
+
+        _health.SetCurrent(newValue);
+    }
     public void SetMovement(in Vector3 position, in Vector3 velocity, in float averageInterval)
     {
         targetPosition = position + (velocity * averageInterval);
         _velocityMagnitude = velocity.magnitude;
 
         this.velocity = velocity;
+    }
+
+    public void ApplyDamage(int damage)
+    {
+        _health.ApplyDamage(damage);
+
+        Dictionary<string, object> data = new Dictionary<string, object>() {
+
+            {"id", _sessionID },
+            {"value", damage }
+        };
+
+        MultiplayerManager.Instance.SendMessage("damage", data);
     }
     public void SetRotateX(in float rotation)
     {

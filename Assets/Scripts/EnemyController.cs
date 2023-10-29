@@ -5,7 +5,8 @@ using UnityEngine;
 public class EnemyController : MonoBehaviour
 {
     [SerializeField] private EnemyCharacter _character;
-    [SerializeField] private EnemyGun _gun;
+    [SerializeField] private List<EnemyGun> _guns;
+    [SerializeField] private int _currentGun = 0;
     [SerializeField] private List<float> _receiveTimeInterval = new List<float>() { 0, 0, 0, 0, 0 };
     private float AverageInterval
     {
@@ -23,10 +24,12 @@ public class EnemyController : MonoBehaviour
     private float _lastReceiveTime = 0;
     private Player _player;
 
-    public void Init(Player player)
+    public void Init(string key, Player player)
     {
+        _character.Init(key);
         _player = player;
         _character.SetSpeed(player.speed);
+        _character.SetMaxHP(player.mHP);
         player.OnChange += OnChange;
     }
 
@@ -38,7 +41,16 @@ public class EnemyController : MonoBehaviour
         Vector3 velocity = new Vector3(info.dX,
                                        info.dY,
                                        info.dZ);
-        _gun.Shoot(position, velocity);
+        _guns[_currentGun].Shoot(position, velocity);
+    }
+
+    private void ChangeGun(byte gunIndex)
+    {
+        _currentGun = gunIndex;
+        for (int i = 0; i < _guns.Count; i++)
+        {
+            _guns[i].gameObject.SetActive(i == gunIndex);
+        }
     }
 
     public void Destroy()
@@ -70,6 +82,18 @@ public class EnemyController : MonoBehaviour
         {
             switch (dataChange.Field)
             {
+                case "tGun":
+                    ChangeGun((byte)dataChange.Value);
+                    break;
+                case "cHP":
+                    if ((sbyte)dataChange.Value > (sbyte)dataChange.PreviousValue)
+                    {
+                        _character.RestoreHP((sbyte)dataChange.Value);
+                    }
+                    break;
+                case "loss":
+                    MultiplayerManager.Instance._lossCounter.SetEnemyLoss((byte)dataChange.Value);
+                    break;
                 case "pX":
                     position.x = (float)dataChange.Value;
                     break;
